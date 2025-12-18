@@ -64,23 +64,10 @@ static void MonitorCramErrors(void);
 /* Polling interval (in seconds) between CRAM status checks in the monitor */
 #define XSEM_CRAM_MONITOR_DELAY_SEC    (1U)
 
-/* Column width for aligned CRAM monitoring output */
-/*
- * Column width for aligned CRAM monitoring output. Kept compact so the
- * complete CSV line fits in a standard ~80-character console row.
- */
-#define XSEM_CRAM_MONITOR_COL_WIDTH    (12)
-#define STR_HELPER(x)                  #x
-#define STR(x)                         STR_HELPER(x)
-#define XSEM_CRAM_MONITOR_COL_WIDTH_STR STR(XSEM_CRAM_MONITOR_COL_WIDTH)
-#define XSEM_CRAM_MONITOR_HEADER_FMT "%-" XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" \
-	XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" \
-	XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" \
-	XSEM_CRAM_MONITOR_COL_WIDTH_STR "s\n\r"
-#define XSEM_CRAM_MONITOR_DATA_FMT "%" XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" \
-	XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" \
-	XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" \
-	XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu\n\r"
+/* Fixed-width, comma-separated headers for CRAM monitoring output. */
+#define XSEM_CRAM_MONITOR_HEADER_FMT "SecElapsed,CorECCCnt,UncorECCCnt,CRCErrCnt,CorEvtCnt,IntErrCnt\n\r"
+/* Numeric CRAM monitoring output in CSV form. */
+#define XSEM_CRAM_MONITOR_DATA_FMT "%lu,%lu,%lu,%lu,%lu,%lu\n\r"
 
 /*Global variables to hold the Fail count */
 u32 FailCnt= 0;
