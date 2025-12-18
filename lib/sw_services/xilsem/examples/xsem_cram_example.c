@@ -70,6 +70,17 @@ static void MonitorCramErrors(void);
  * complete CSV line fits in a standard ~80-character console row.
  */
 #define XSEM_CRAM_MONITOR_COL_WIDTH    (12)
+#define STR_HELPER(x)                  #x
+#define STR(x)                         STR_HELPER(x)
+#define XSEM_CRAM_MONITOR_COL_WIDTH_STR STR(XSEM_CRAM_MONITOR_COL_WIDTH)
+#define XSEM_CRAM_MONITOR_HEADER_FMT "%-" XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" \
+	XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" \
+	XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" XSEM_CRAM_MONITOR_COL_WIDTH_STR "s,%-" \
+	XSEM_CRAM_MONITOR_COL_WIDTH_STR "s\n\r"
+#define XSEM_CRAM_MONITOR_DATA_FMT "%" XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" \
+	XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" \
+	XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu,%" \
+	XSEM_CRAM_MONITOR_COL_WIDTH_STR "lu\n\r"
 
 /*Global variables to hold the Fail count */
 u32 FailCnt= 0;
@@ -563,28 +574,22 @@ static void MonitorCramErrors(void)
 
         xil_printf("\n\rEntering continuous CRAM error monitoring (every %u second(s))...\n\r",
                         XSEM_CRAM_MONITOR_DELAY_SEC);
-        xil_printf("%-*s,%-*s,%-*s,%-*s,%-*s,%-*s\n\r",
-                        XSEM_CRAM_MONITOR_COL_WIDTH, "SecElapsed",
-                        XSEM_CRAM_MONITOR_COL_WIDTH, "CorECCCnt",
-                        XSEM_CRAM_MONITOR_COL_WIDTH, "UncorECCCnt",
-                        XSEM_CRAM_MONITOR_COL_WIDTH, "CRCErrCnt",
-                        XSEM_CRAM_MONITOR_COL_WIDTH, "CorEvtCnt",
-                        XSEM_CRAM_MONITOR_COL_WIDTH, "IntErrCnt");
+        xil_printf(XSEM_CRAM_MONITOR_HEADER_FMT,
+                        "SecElapsed",
+                        "CorECCCnt",
+                        "UncorECCCnt",
+                        "CRCErrCnt",
+                        "CorEvtCnt",
+                        "IntErrCnt");
         while (1) {
                 (void)XSem_CmdCfrGetStatus(&CfrStatusInfo);
 
-                xil_printf("%*lu,%*lu,%*lu,%*lu,%*lu,%*lu\n\r",
-                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                xil_printf(XSEM_CRAM_MONITOR_DATA_FMT,
                                 (unsigned long)ElapsedSeconds,
-                                XSEM_CRAM_MONITOR_COL_WIDTH,
                                 (unsigned long)CfrStatusInfo.ErrCorCnt,
-                                XSEM_CRAM_MONITOR_COL_WIDTH,
                                 (unsigned long)EventCnt_UnCorEcc,
-                                XSEM_CRAM_MONITOR_COL_WIDTH,
                                 (unsigned long)EventCnt_Crc,
-                                XSEM_CRAM_MONITOR_COL_WIDTH,
                                 (unsigned long)EventCnt_CorEcc,
-                                XSEM_CRAM_MONITOR_COL_WIDTH,
                                 (unsigned long)EventCnt_IntErr);
 
                 ElapsedSeconds++;
