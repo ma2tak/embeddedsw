@@ -55,18 +55,30 @@ static XScuGic GicInst;
 XSem_Notifier Notifier = {
         .Module = XSEM_NOTIFY_CRAM,
         .Event = XSEM_EVENT_CRAM_UNCOR_ECC_ERR | XSEM_EVENT_CRAM_CRC_ERR | \
-		 XSEM_EVENT_CRAM_INT_ERR | XSEM_EVENT_CRAM_COR_ECC_ERR,
-	.Flag = 1U,
+                 XSEM_EVENT_CRAM_INT_ERR | XSEM_EVENT_CRAM_COR_ECC_ERR,
+        .Flag = 1U,
 };
+
+static void MonitorCramErrors(void);
+
+/* Polling interval (in seconds) between CRAM status checks in the monitor */
+#define XSEM_CRAM_MONITOR_DELAY_SEC    (1U)
+
+/* Column width for aligned CRAM monitoring output */
+/*
+ * Column width for aligned CRAM monitoring output. Kept compact so the
+ * complete CSV line fits in a standard ~80-character console row.
+ */
+#define XSEM_CRAM_MONITOR_COL_WIDTH    (12)
 
 /*Global variables to hold the Fail count */
 u32 FailCnt= 0;
 
 /*Global variables to hold the event count when notified*/
-u8 EventCnt_UnCorEcc = 0U;
-u8 EventCnt_Crc = 0U;
-u8 EventCnt_CorEcc = 0U;
-u8 EventCnt_IntErr = 0U;
+volatile u32 EventCnt_UnCorEcc = 0U;
+volatile u32 EventCnt_Crc = 0U;
+volatile u32 EventCnt_CorEcc = 0U;
+volatile u32 EventCnt_IntErr = 0U;
 
 /****************************************************************************
  * @brief    	Initialize XilSEM IPI instance and register ISR handler to
@@ -524,9 +536,9 @@ void PrintErrReport(u32 IntialCorErrCnt)
  *****************************************************************************/
 int Xsem_CfrEventRegisterNotifier(u32 Enable)
 {
-	int Status;
+        int Status;
 
-	if (Enable) {
+        if (Enable) {
 		Notifier.Flag = 1U;
 	} else {
 		Notifier.Flag = 0U;
@@ -537,7 +549,47 @@ int Xsem_CfrEventRegisterNotifier(u32 Enable)
 	 */
 	Status = XSem_RegisterEvent(&IpiInst, &Notifier);
 
-	return Status;
+        return Status;
+}
+
+/******************************************************************************
+ * @brief       Monitor CRAM errors continuously and print updates to the
+ *              serial console.
+ *****************************************************************************/
+static void MonitorCramErrors(void)
+{
+        XSemCfrStatus CfrStatusInfo = {0};
+        u32 ElapsedSeconds = 0U;
+
+        xil_printf("\n\rEntering continuous CRAM error monitoring (every %u second(s))...\n\r",
+                        XSEM_CRAM_MONITOR_DELAY_SEC);
+        xil_printf("%-*s,%-*s,%-*s,%-*s,%-*s,%-*s\n\r",
+                        XSEM_CRAM_MONITOR_COL_WIDTH, "SecElapsed",
+                        XSEM_CRAM_MONITOR_COL_WIDTH, "CorECCCnt",
+                        XSEM_CRAM_MONITOR_COL_WIDTH, "UncorECCCnt",
+                        XSEM_CRAM_MONITOR_COL_WIDTH, "CRCErrCnt",
+                        XSEM_CRAM_MONITOR_COL_WIDTH, "CorEvtCnt",
+                        XSEM_CRAM_MONITOR_COL_WIDTH, "IntErrCnt");
+        while (1) {
+                (void)XSem_CmdCfrGetStatus(&CfrStatusInfo);
+
+                xil_printf("%*lu,%*lu,%*lu,%*lu,%*lu,%*lu\n\r",
+                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                                (unsigned long)ElapsedSeconds,
+                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                                (unsigned long)CfrStatusInfo.ErrCorCnt,
+                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                                (unsigned long)EventCnt_UnCorEcc,
+                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                                (unsigned long)EventCnt_Crc,
+                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                                (unsigned long)EventCnt_CorEcc,
+                                XSEM_CRAM_MONITOR_COL_WIDTH,
+                                (unsigned long)EventCnt_IntErr);
+
+                ElapsedSeconds++;
+                sleep(XSEM_CRAM_MONITOR_DELAY_SEC);
+        }
 }
 
 /******************************************************************************
@@ -551,37 +603,23 @@ void XSem_IpiCallback(void)
 	int Status;
 	u32 Payload[PAYLOAD_ARG_CNT] = {0};
 
-
-	Status = XIpiPsu_ReadMessage(&IpiInst, SRC_IPI_MASK, Payload, \
+	Status = XIpiPsu_ReadMessage(&IpiInst, SRC_IPI_MASK, Payload,\
 			PAYLOAD_ARG_CNT, XIPIPSU_BUF_TYPE_MSG);
 	if (Status != XST_SUCCESS) {
-		xil_printf("ERROR #%d while reading IPI buffer\n", Status);
 		return;
 	}
 
-	if ((XSEM_EVENT_ERROR == Payload[0]) && \
+	if ((XSEM_EVENT_ERROR == Payload[0]) &&\
 			(XSEM_NOTIFY_CRAM == Payload[1])) {
 		if (XSEM_EVENT_CRAM_UNCOR_ECC_ERR == Payload[2]) {
-			xil_printf("Received CRAM Uncorrectable error event \n");
-			EventCnt_UnCorEcc = 1U;
+			EventCnt_UnCorEcc++;
 		} else if (XSEM_EVENT_CRAM_CRC_ERR == Payload[2]) {
-			xil_printf("Received CRAM CRC error event \n");
-			EventCnt_Crc = 1U;
+			EventCnt_Crc++;
 		} else if (XSEM_EVENT_CRAM_INT_ERR == Payload[2]) {
-			xil_printf("[ALERT] Received internal error event" \
-				" notification from XilSEM\n\r");
-			EventCnt_IntErr = 1U;
+			EventCnt_IntErr++;
 		} else if (XSEM_EVENT_CRAM_COR_ECC_ERR == Payload[2]) {
-			xil_printf("Received CRAM Correcatble error event \n");
-			EventCnt_CorEcc = 1U;
-		} else {
-			xil_printf("%s Someother callback received: %d:%d:%d\n",
-					__func__, Payload[0], \
-					Payload[1], Payload[2]);
+			EventCnt_CorEcc++;
 		}
-	} else {
-		xil_printf("%s Some other callback received: %d\n", \
-				__func__, Payload[0]);
 	}
 }
 
@@ -788,13 +826,15 @@ int main(void)
 #endif /* End of XILSEM_ERRINJ_ENABLE */
 
 END:
-	xil_printf("\n\r-------------- Test Report --------------\n\r");
-	xil_printf("Failed Command Count : %d\n\r", FailCnt);
-	if(FailCnt) {
-		xil_printf("CRAM examples Failed \n");
-	}else{
-		xil_printf("CRAM examples ran successfully \n");
-	}
-	xil_printf("-----------------------------------------\n\r");
-	return 0;
+        xil_printf("\n\r-------------- Test Report --------------\n\r");
+        xil_printf("Failed Command Count : %d\n\r", FailCnt);
+        if(FailCnt) {
+                xil_printf("CRAM examples Failed \n");
+        }else{
+                xil_printf("CRAM examples ran successfully \n");
+        }
+        xil_printf("-----------------------------------------\n\r");
+
+        MonitorCramErrors();
+        return 0;
 }
